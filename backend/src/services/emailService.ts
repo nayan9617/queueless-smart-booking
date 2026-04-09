@@ -4,6 +4,8 @@ import path from 'path';
 
 dotenv.config({ path: path.join(__dirname, '../../../.env') });
 
+const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+
 // Create transporter
 const transporter = nodemailer.createTransport({
     service: 'gmail',
@@ -126,7 +128,7 @@ export const sendWelcomeEmail = async (email: string, name: string) => {
             <p>Get started by exploring salons near you!</p>
             <br/>
             <div style="text-align: center;">
-                <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Go to Dashboard</a>
+                <a href="${clientUrl}" style="background-color: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Go to Dashboard</a>
             </div>
         </div>
     `;
@@ -144,7 +146,7 @@ export const sendBookingCompletion = async (booking: any, salonName: string) => 
             <p>Thank you for using QueueLess. We would love to hear your feedback!</p>
             
             <div style="text-align: center; margin: 30px 0;">
-                <a href="${process.env.CLIENT_URL || 'http://localhost:5173'}/dashboard" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Rate Your Experience</a>
+                <a href="${clientUrl}/dashboard" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">Rate Your Experience</a>
             </div>
             
             <p>See you next time!</p>
