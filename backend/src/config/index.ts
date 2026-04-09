@@ -2,11 +2,13 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import path from 'path';
 
-dotenv.config({ path: path.join(__dirname, '../../../.env') });
+const envPath = path.join(__dirname, '../../../.env');
+
+dotenv.config({ path: envPath });
 
 const connectDB = async () => {
     try {
-        const mongoURI = process.env.MONGO_URI || '';
+        const mongoURI = process.env.MONGO_URI || 'mongodb://localhost:27017/queueless';
         await mongoose.connect(mongoURI, { dbName: 'queueless' });
         console.log('MongoDB Connected Successfully');
     } catch (error) {
