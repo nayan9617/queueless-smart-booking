@@ -1,0 +1,13 @@
+.env
+
+**/node_modules/
+**/dist/
+**/build/
+**/.next/
+**/coverage/
+**/*.log
+
+backend/backend.log
+ml-service/venv/
+
+.DS_Store
