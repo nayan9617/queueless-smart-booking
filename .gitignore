@@ -5,6 +5,8 @@
 **/build/
 **/.next/
 **/coverage/
+**/__pycache__/
+**/*.pyc
 **/*.log
 
 backend/backend.log
