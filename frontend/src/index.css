@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-primary: #3b82f6;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #64748b;
+  --color-secondary-foreground: #ffffff;
+
+  --color-background: #f8fafc;
+  --color-foreground: #0f172a;
+
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+
+  --animate-pulse-slow: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+  @keyframes pulse-slow {
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: 0.5;
+    }
+  }
+}
+
+/* Dark mode overrides */
+@layer base {
+  :root {
+    --color-background: #f8fafc;
+    /* slate-50 */
+    --color-foreground: #0f172a;
+    /* slate-900 */
+    --color-card: #ffffff;
+    --color-card-foreground: #0f172a;
+  }
+
+  .dark {
+    --color-background: #0f172a;
+    /* slate-900 */
+    --color-foreground: #f8fafc;
+    /* slate-50 */
+    --color-card: #1e293b;
+    /* slate-800 */
+    --color-card-foreground: #f8fafc;
+  }
+
+  body {
+    @apply bg-[var(--color-background)] text-[var(--color-foreground)] font-sans transition-colors duration-300;
+  }
+}
+
+/* Base styles */
+@layer base {
+  /* Removed redundant body style that was overriding the theme variables */
+}
