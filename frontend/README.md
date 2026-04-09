@@ -1,3 +1,23 @@
+# Frontend
+
+React + Vite client for QueueLess.
+
+## Setup
+
+```bash
+npm install
+npm run dev
+```
+
+## Environment
+
+The client uses `VITE_API_URL` when present. If it is not set, the app falls back to the local backend.
+
+## Scripts
+
+- `npm run dev` - Start the development server.
+- `npm run build` - Build the app for production.
+- `npm run lint` - Lint the frontend source.
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
