@@ -22,10 +22,6 @@ app.use(cors());
 app.use(helmet());
 app.use(morgan('dev'));
 
-// Database Connection
-// Database Connection
-// connectDB(); // Moved to startServer
-
 // Basic Routes
 app.get('/', (req: Request, res: Response) => {
     res.json({ message: 'QueueLess API is running 🚀' });
@@ -41,8 +37,6 @@ app.use('/api/auth', authRoutes);
 app.use('/api/salons', salonRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/staff', staffRoutes);
-
-
 
 // Error Handling Middleware
 app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
