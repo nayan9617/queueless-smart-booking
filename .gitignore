@@ -11,5 +11,11 @@
 
 backend/backend.log
 ml-service/venv/
+backend/uploads/
+
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/playwright/.cache/
 
 .DS_Store
