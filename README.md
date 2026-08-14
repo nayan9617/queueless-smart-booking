@@ -95,6 +95,8 @@ cd ml-service && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 - `npm run build` - Compile TypeScript.
 - `npm start` - Run the compiled server.
 - `npm run lint` - Lint the backend source.
+- `npm test` - Run queue math unit tests (`tsx --test`).
+- `npm run seed` - Seed sample Jodhpur salons.
 
 ### Frontend
 
