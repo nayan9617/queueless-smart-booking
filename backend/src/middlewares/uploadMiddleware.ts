@@ -1,15 +1,29 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import multer from 'multer';
 
-const uploadsRoot = path.join(__dirname, '../../uploads/salons');
+const uploadsRoot = process.env.VERCEL
+    ? path.join(os.tmpdir(), 'queueless-uploads', 'salons')
+    : path.join(__dirname, '../../uploads/salons');
 
-if (!fs.existsSync(uploadsRoot)) {
-    fs.mkdirSync(uploadsRoot, { recursive: true });
+const ensureUploadsRoot = () => {
+    try {
+        fs.mkdirSync(uploadsRoot, { recursive: true });
+    } catch {
+        // Read-only deploys skip local photo storage
+    }
+};
+
+if (!process.env.VERCEL) {
+    ensureUploadsRoot();
 }
 
 const storage = multer.diskStorage({
-    destination: (_req, _file, cb) => cb(null, uploadsRoot),
+    destination: (_req, _file, cb) => {
+        ensureUploadsRoot();
+        cb(null, uploadsRoot);
+    },
     filename: (_req, file, cb) => {
         const safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
         cb(null, `${Date.now()}-${safe}`);
