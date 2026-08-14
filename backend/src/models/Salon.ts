@@ -15,6 +15,8 @@ export interface ISalon extends Document {
         lng: number;
     };
     chairs: number;
+    /** Concurrent in-progress services — atomically claimed/released */
+    inProgressCount: number;
     services: IService[];
     status: 'open' | 'closed' | 'break';
     images: string[];
@@ -38,6 +40,7 @@ const SalonSchema: Schema = new Schema({
         lng: { type: Number, required: true }
     },
     chairs: { type: Number, required: true, min: 1 },
+    inProgressCount: { type: Number, default: 0, min: 0 },
     services: [{
         name: { type: String, required: true },
         durationMin: { type: Number, required: true },
@@ -54,5 +57,9 @@ const SalonSchema: Schema = new Schema({
         currentBookingId: { type: Schema.Types.ObjectId, ref: 'Booking' }
     }]
 }, { timestamps: true });
+
+SalonSchema.index({ ownerId: 1 }, { unique: true });
+SalonSchema.index({ name: 'text', address: 'text' });
+SalonSchema.index({ rating: -1 });
 
 export default mongoose.model<ISalon>('Salon', SalonSchema);

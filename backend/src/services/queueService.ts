@@ -1,110 +1,153 @@
 import Booking from '../models/Booking';
 import Salon from '../models/Salon';
 import { getIO } from '../socket';
-import { sendBookingUpdate } from './emailService';
+import { predictWaitTime } from './mlService';
+import { logger } from '../utils/logger';
+import {
+    clampStartMs,
+    concurrentSlotCount,
+    remainingServiceMinutes,
+} from './queueMath';
 
+/**
+ * Live queue: discrete-event chair simulation (ground truth for "who's next"),
+ * blended with the ML hybrid so peak/weekend/load effects stay learned.
+ */
 export const recalculateSalonQueue = async (salonId: string) => {
-    console.log('Queue Service: Recalculating for', salonId);
+    logger.event('queue_recalculated', { salonId });
     try {
         const salon = await Salon.findById(salonId);
         if (!salon) return;
 
-        // 1. Get all active bookings
-        // - In-progress: Needed to know when chairs free up
-        // - Confirmed: The queue to be scheduled
         const activeBookings = await Booking.find({
             salonId,
-            status: { $in: ['in-progress', 'confirmed'] }
-        }).sort({ bookingTime: 1 }); // FIFO
+            status: { $in: ['in-progress', 'confirmed'] },
+            paymentStatus: 'paid',
+        }).sort({ bookingTime: 1 });
 
-        const inProgress = activeBookings.filter(b => b.status === 'in-progress');
-        const confirmed = activeBookings.filter(b => b.status === 'confirmed');
+        const inProgress = activeBookings.filter((b) => b.status === 'in-progress');
+        const confirmed = activeBookings.filter((b) => b.status === 'confirmed');
 
-        // 2. Initialize Chairs
-        // Each chair tracks when it will be free (timestamp in ms)
-        // If salon has 3 chairs, we initiate with [now, now, now]
-        // If in-progress booking exists, it occupies a chair until (actualStartTime + duration)
-        const now = Date.now();
+        const nowMs = Date.now();
+        const now = new Date(nowMs);
 
-        // Calculate concurrency based on available staff and chairs
-        // We can't serve more customers than we have staff, even if we have chairs.
         // @ts-ignore
-        const availableStaff = salon.staff ? salon.staff.filter(s => s.isAvailable).length : salon.chairs;
-        const concurrentSlots = Math.max(1, Math.min(salon.chairs, availableStaff));
+        const availableStaff = salon.staff
+            ? // @ts-ignore
+              salon.staff.filter((s) => s.isAvailable).length
+            : 0;
+        const totalStaff = salon.staff?.length || 0;
+        const concurrentSlots = concurrentSlotCount(salon.chairs, availableStaff, totalStaff);
+        const chairs: number[] = new Array(concurrentSlots).fill(nowMs);
 
-        console.log(`Queue Calc: Chairs=${salon.chairs}, Staff=${availableStaff}, Slots=${concurrentSlots}`);
+        const remainingDuration = (booking: any) => {
+            const durationMin = (booking.services || []).reduce(
+                (acc: number, s: any) => acc + (s.duration || 30),
+                0
+            );
+            return remainingServiceMinutes(
+                durationMin,
+                booking.status,
+                booking.actualStartTime,
+                nowMs
+            );
+        };
 
-        const chairs: number[] = new Array(concurrentSlots).fill(now);
-
-        // Assign in-progress bookings to chairs first
-        // We assume they take up the "first" available chairs for simplicity in calculation, 
-        // effectively reducing availability.
-        inProgress.forEach(booking => {
-            // Find earliest available chair (which is 'now' initially)
-            // But actually, for in-progress, we need to add their REMAINING time to 'now' 
-            // OR use their actual End Time.
-            // Formula: EndTime = ActualStartTime + TotalDuration
-            const startTime = booking.actualStartTime ? new Date(booking.actualStartTime).getTime() : now;
-
-            // Calculate total duration of services
-            // @ts-ignore
-            const durationMin = booking.services.reduce((acc, s) => acc + (s.duration || 30), 0);
-            const endTime = startTime + (durationMin * 60000);
-
-            // Find the chair that is free earliest (should be 'now') and occupy it
+        inProgress.forEach((booking) => {
+            const startTime = booking.actualStartTime
+                ? new Date(booking.actualStartTime).getTime()
+                : nowMs;
+            const durationMin = (booking.services || []).reduce(
+                (acc: number, s: any) => acc + (s.duration || 30),
+                0
+            );
+            const endTime = startTime + durationMin * 60000;
             const earliestChairIdx = chairs.indexOf(Math.min(...chairs));
-
-            // If endTime is in past (shouldn't happen for in-progress), set to now
-            chairs[earliestChairIdx] = Math.max(now, endTime);
+            chairs[earliestChairIdx] = Math.max(nowMs, endTime);
         });
 
-        // 3. Process Confirmed Queue
+        let peopleAhead = inProgress.length;
+        let workloadAhead = inProgress.reduce((sum, b) => sum + remainingDuration(b), 0);
+
+        const timeOfDay = now.getHours() * 60 + now.getMinutes();
+        const dayOfWeek = (now.getDay() + 6) % 7;
+
         for (const booking of confirmed) {
-            // Find earliest free chair
             const earliestChairIdx = chairs.indexOf(Math.min(...chairs));
             const nextFreeTime = chairs[earliestChairIdx];
+            const physicsWait = Math.max(0, Math.ceil((nextFreeTime - nowMs) / 60000));
 
-            // Estimated Start is nextFreeTime
-            // Estimated Wait is (nextFreeTime - now)
-            const estimatedWaitTimeMin = Math.max(0, Math.ceil((nextFreeTime - now) / 60000));
+            const durationMin = (booking.services || []).reduce(
+                (acc: number, s: any) => acc + (s.duration || 30),
+                0
+            );
 
-            // Calculate this booking's duration
-            // @ts-ignore
-            const durationMin = booking.services.reduce((acc, s) => acc + (s.duration || 30), 0);
+            chairs[earliestChairIdx] = nextFreeTime + durationMin * 60000;
 
-            // Update chair to be busy until Start + Duration
-            chairs[earliestChairIdx] = nextFreeTime + (durationMin * 60000);
+            let estimatedWaitTimeMin = physicsWait;
+            let confidence: number | undefined;
 
-            // 4. Update Booking if significant change (> 2 mins difference)
-            // 4. Update Booking if significant change (> 2 mins difference) AND NOT manually overridden
+            try {
+                const ml = await predictWaitTime({
+                    queue_length: peopleAhead,
+                    active_barbers: concurrentSlots,
+                    service_duration_avg: durationMin || 30,
+                    time_of_day: timeOfDay,
+                    day_of_week: dayOfWeek,
+                    total_chairs: salon.chairs,
+                    queue_workload: workloadAhead,
+                });
+                estimatedWaitTimeMin = Math.max(
+                    0,
+                    Math.round(0.62 * physicsWait + 0.38 * ml.waitTime)
+                );
+                confidence = ml.confidence;
+            } catch {
+                estimatedWaitTimeMin = physicsWait;
+            }
+
+            peopleAhead += 1;
+            workloadAhead += durationMin;
+
             // @ts-ignore
             const oldWaitTime = booking.estimatedWaitTime;
             // @ts-ignore
             const isOverridden = booking.isTimeOverridden;
 
-            if (!isOverridden && (oldWaitTime === undefined || Math.abs(oldWaitTime - estimatedWaitTimeMin) > 2)) {
+            if (
+                !isOverridden &&
+                (oldWaitTime === undefined || Math.abs(oldWaitTime - estimatedWaitTimeMin) > 2)
+            ) {
+                const bookingTimeMs = booking.bookingTime
+                    ? new Date(booking.bookingTime).getTime()
+                    : nowMs;
+                const startMs = clampStartMs(bookingTimeMs, nowMs, estimatedWaitTimeMin);
+                const clampedWait = Math.max(0, Math.ceil((startMs - nowMs) / 60000));
+
                 // @ts-ignore
-                booking.estimatedWaitTime = estimatedWaitTimeMin;
+                booking.estimatedWaitTime = clampedWait;
                 // @ts-ignore
-                booking.estimatedStartTime = new Date(nextFreeTime);
+                booking.estimatedStartTime = new Date(startMs);
+                if (typeof confidence === 'number') {
+                    // @ts-ignore
+                    booking.predictionConfidence = confidence;
+                }
                 await booking.save();
 
-                // Notify User (Email) - Only if change is large (e.g. > 10 mins) or if it's "Your turn is soon"
-                // To avoid spam, maybe only send if time reduced significantly or increased?
-                // For now, let's keep email logic conservative or commented out to avoid spam during testing.
-                // Or user requested: "dynamically adjust... [and] update". User didn't explicitly ask for email on EVERY update, but implied "shown... accurate".
-                // Display update via Socket is most important.
-
-                // Emit socket update
-                // @ts-ignore
-                getIO().emit(`queue-update-${salonId}`, {
+                const payload = {
                     type: 'ESTIMATE_UPDATE',
                     bookingId: booking._id,
-                    estimatedWaitTime: estimatedWaitTimeMin
-                });
+                    estimatedWaitTime: clampedWait,
+                    estimatedStartTime: new Date(startMs),
+                    confidence,
+                };
+                getIO().to(salonId).emit('booking_updated', payload);
+                getIO().emit(`queue-update-${salonId}`, payload);
+                if (booking.userId) {
+                    getIO().to(`user:${String(booking.userId)}`).emit('booking_updated', payload);
+                }
             }
         }
-
     } catch (error) {
         console.error('Queue Recalculation Error:', error);
     }

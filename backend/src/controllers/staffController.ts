@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import Salon from '../models/Salon';
+import { logger } from '../utils/logger';
 
 // Add new staff member
 export const addStaff = async (req: Request, res: Response) => {
@@ -20,6 +21,7 @@ export const addStaff = async (req: Request, res: Response) => {
         } as any);
 
         await salon.save();
+        logger.event('staff_created', { salonId: String(salon._id), name });
         res.status(201).json(salon.staff);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
@@ -66,6 +68,11 @@ export const updateStaffAvailability = async (req: Request, res: Response) => {
 
         staff.isAvailable = isAvailable;
         await salon.save();
+        logger.event('staff_updated', {
+            salonId: String(salon._id),
+            staffId,
+            isAvailable,
+        });
         res.json(staff);
     } catch (error: any) {
         res.status(500).json({ message: error.message });
