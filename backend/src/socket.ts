@@ -5,6 +5,7 @@ import Salon from './models/Salon';
 import Booking from './models/Booking';
 import { bump } from './utils/betaCounters';
 import { logger } from './utils/logger';
+import { allowedOrigins } from './utils/allowedOrigins';
 
 let io: Server;
 
@@ -26,11 +27,9 @@ const getTokenFromHandshake = (socket: Socket): string | null => {
 };
 
 export const initSocket = (httpServer: HttpServer) => {
-    const clientOrigin = process.env.CLIENT_URL || 'http://localhost:5173';
-
     io = new Server(httpServer, {
         cors: {
-            origin: [clientOrigin, 'http://localhost:5173', 'http://127.0.0.1:5173'],
+            origin: allowedOrigins(),
             methods: ['GET', 'POST'],
             credentials: true,
         },

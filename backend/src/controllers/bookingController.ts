@@ -22,6 +22,7 @@ import { logger } from '../utils/logger';
 import { bump } from '../utils/betaCounters';
 import { setRequestContext } from '../utils/requestContext';
 import { isDangerousFlagEnabled } from '../utils/envSafety';
+import { expireStalePendingBookings } from '../services/pendingExpiryService';
 
 const finalizeConfirmedBooking = async (booking: any, salon: any) => {
     await recalculateSalonQueue(String(salon._id));
@@ -56,6 +57,7 @@ const finalizeConfirmedBooking = async (booking: any, salon: any) => {
 
 export const createBooking = async (req: Request, res: Response) => {
     try {
+        await expireStalePendingBookings().catch(() => undefined);
         const { salonId, services, contactInfo, notes, clientRequestId } = req.body;
         // @ts-ignore
         const userId = req.user.id;

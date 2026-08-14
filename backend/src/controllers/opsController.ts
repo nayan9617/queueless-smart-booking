@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import Booking from '../models/Booking';
 import { snapshotCounters } from '../utils/betaCounters';
 import { probeMlHealth } from '../services/mlService';
+import { expireStalePendingBookings } from '../services/pendingExpiryService';
 
 /** Public, low-detail health for beta uptime checks. */
 export const getHealth = async (_req: Request, res: Response) => {
@@ -57,4 +58,19 @@ export const getBetaStats = async (_req: Request, res: Response) => {
         },
         processCounters: snapshotCounters(),
     });
+};
+
+/** Vercel Cron + founder key. Expires unpaid pending holds. */
+export const expirePending = async (req: Request, res: Response) => {
+    const cronSecret = process.env.CRON_SECRET;
+    const opsSecret = process.env.BETA_OPS_SECRET;
+    const bearer = req.headers.authorization;
+    const cronOk = Boolean(cronSecret && bearer === `Bearer ${cronSecret}`);
+    const opsOk = Boolean(opsSecret && req.header('x-beta-ops-key') === opsSecret);
+    if (!cronOk && !opsOk) {
+        return res.status(404).json({ message: 'Not found' });
+    }
+
+    const expired = await expireStalePendingBookings();
+    res.json({ ok: true, expired });
 };

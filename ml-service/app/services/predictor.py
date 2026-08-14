@@ -49,7 +49,10 @@ class WaitTimePredictor:
     def _ensure_model_dir(self) -> None:
         directory = os.path.dirname(MODEL_PATH)
         if directory:
-            os.makedirs(directory, exist_ok=True)
+            try:
+                os.makedirs(directory, exist_ok=True)
+            except OSError:
+                pass
 
     def train(self, use_synthetic_if_scarce: bool = True) -> dict[str, Any]:
         real = fetch_training_data()

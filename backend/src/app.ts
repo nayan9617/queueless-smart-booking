@@ -11,6 +11,7 @@ import { startPendingBookingExpiryJob } from './services/pendingExpiryService';
 import { requestIdMiddleware } from './middlewares/requestIdMiddleware';
 import { logger } from './utils/logger';
 import { warnUnsafeEnvFlags } from './utils/envSafety';
+import { allowedOrigins } from './utils/allowedOrigins';
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '../../.env') });
@@ -20,16 +21,22 @@ app.disable('etag'); // Force 200 OK responses to prevent stale cache
 const httpServer = createServer(app);
 const io = initSocket(httpServer);
 
+const isVercel = Boolean(process.env.VERCEL);
+
 // Middleware
 app.use(requestIdMiddleware);
+app.use(async (_req: Request, _res: Response, next: NextFunction) => {
+    try {
+        await connectDB();
+        next();
+    } catch (err) {
+        next(err);
+    }
+});
 app.use(express.json({ limit: '2mb' }));
 app.use(
     cors({
-        origin: [
-            process.env.CLIENT_URL || 'http://localhost:5173',
-            'http://localhost:5173',
-            'http://127.0.0.1:5173',
-        ],
+        origin: allowedOrigins(),
         credentials: true,
     })
 );
@@ -83,12 +90,19 @@ const PORT = process.env.PORT || 5001;
 const startServer = async () => {
     warnUnsafeEnvFlags();
     await connectDB();
-    startPendingBookingExpiryJob();
-    httpServer.listen(PORT, () => {
-        logger.info('server_started', { port: Number(PORT) });
-    });
+    if (!isVercel) {
+        startPendingBookingExpiryJob();
+    }
+    if (!isVercel) {
+        httpServer.listen(PORT, () => {
+            logger.info('server_started', { port: Number(PORT) });
+        });
+    } else {
+        logger.info('vercel_function_ready');
+    }
 };
 
-startServer();
+void startServer();
 
+export default httpServer;
 export { app, io };

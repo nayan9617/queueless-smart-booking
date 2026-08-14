@@ -170,17 +170,21 @@ Local E2E may set `ALLOW_DEMO_PAY` and `ALLOW_TEST_EMAIL_VERIFY`. Those flags ar
 
 ## Deploy / beta
 
+Target host for private beta is **Vercel** (three projects from this repo). Details: [`docs/deployment.md`](./docs/deployment.md).
+
 Private beta checklist, monitoring, and launch gate: [`docs/beta-playbook.md`](./docs/beta-playbook.md).
 
 Hard requirements for a shared environment:
 
 - `APP_ENV=beta` (or `NODE_ENV=production`)
 - Unique `JWT_SECRET`, working email, Razorpay **Test Mode** only
-- Single API instance (rate limits and beta counters are in-memory)
-- Persistent volume for `backend/uploads/`
-- Live ML process; point `ML_SERVICE_URL` at it
+- MongoDB Atlas with `0.0.0.0/0` (or Vercel IPs) allowed
+- Live ML project; point `ML_SERVICE_URL` at it
+- `CLIENT_URL` and `VITE_API_URL` set to the real Vercel URLs before the frontend production build
 
 Do not take live Razorpay keys until the playbook launch gate is met.
+
+On Vercel, salon photo uploads and in-memory rate-limit counters do not persist across instances. Refresh still shows queue state from Mongo if live sockets drop.
 
 ## Known limits
 

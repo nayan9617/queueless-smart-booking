@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+import os
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,8 +10,8 @@ from app.services.predictor import predictor
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # Boot with a real model so predictions are never dummy-hardcoded
-    if predictor.model is None:
+    # Cold starts on Vercel must not train. Ship data/wait_time_model.joblib.
+    if predictor.model is None and not os.getenv("VERCEL"):
         try:
             print("No model on disk — training hybrid wait-time model...")
             predictor.train(use_synthetic_if_scarce=True)

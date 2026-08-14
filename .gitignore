@@ -18,4 +18,6 @@ frontend/playwright-report/
 frontend/blob-report/
 frontend/playwright/.cache/
 
+.vercel
+
 .DS_Store
