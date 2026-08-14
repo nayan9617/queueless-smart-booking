@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../../services/api';
 import toast from 'react-hot-toast';
-import { Loader2, Store, MapPin, Armchair, Plus, Trash2, Save } from 'lucide-react';
+import { Loader2, Store, MapPin, Armchair, Plus, Trash2, Save, Upload } from 'lucide-react';
+import { mediaUrl } from '../../../utils/mediaUrl';
 
 interface Service {
     name: string;
@@ -22,29 +23,29 @@ interface SalonData {
 
 const SalonSettings = () => {
     const queryClient = useQueryClient();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [formData, setFormData] = useState<SalonData | null>(null);
     const [isDirty, setIsDirty] = useState(false);
+    const [uploading, setUploading] = useState(false);
 
-    // UI States for adding items
     const [newService, setNewService] = useState({ name: '', durationMin: 30, price: 0 });
     const [newImage, setNewImage] = useState('');
     const [isAddingService, setIsAddingService] = useState(false);
     const [isAddingImage, setIsAddingImage] = useState(false);
 
     const { data, isLoading } = useQuery<{ salon: SalonData }>({
-        queryKey: ['my-salon-settings'], // Different key to ensure fresh fetch
+        queryKey: ['my-salon-settings'],
         queryFn: async () => {
             const res = await api.get('/bookings/salon-bookings');
             return res.data;
         }
     });
 
-    // Sync data to local state for editing
     useEffect(() => {
-        if (data?.salon) {
+        if (data?.salon && !isDirty) {
             setFormData(data.salon);
         }
-    }, [data]);
+    }, [data, isDirty]);
 
     const updateSalonMutation = useMutation({
         mutationFn: async (updatedData: Partial<SalonData>) => {
@@ -73,6 +74,26 @@ const SalonSettings = () => {
         if (!formData) return;
         setFormData({ ...formData, [field]: value });
         setIsDirty(true);
+    };
+
+    const handleDeviceUpload = async (files: FileList | null) => {
+        if (!files?.length || !formData?._id) return;
+        setUploading(true);
+        try {
+            const body = new FormData();
+            Array.from(files).forEach((f) => body.append('images', f));
+            const res = await api.post(`/salons/${formData._id}/images`, body);
+            setFormData({ ...formData, images: res.data.images });
+            setIsDirty(false);
+            queryClient.invalidateQueries({ queryKey: ['my-salon-settings'] });
+            queryClient.invalidateQueries({ queryKey: ['my-salon'] });
+            toast.success('Photos uploaded');
+        } catch (err: any) {
+            toast.error(err.response?.data?.message || 'Upload failed');
+        } finally {
+            setUploading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
     };
 
     if (isLoading || !formData) {
@@ -271,13 +292,14 @@ const SalonSettings = () => {
                 {/* Right Column: Photos */}
                 <div className="md:col-span-1">
                     <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700 p-6 space-y-4 sticky top-6">
-                        <h3 className="font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-2">Salon Photos</h3>
+                        <h3 className="font-bold text-slate-900 dark:text-white border-b border-slate-100 dark:border-slate-700 pb-2">Salon Photo Album</h3>
+                        <p className="text-xs text-slate-500">Upload from your device or paste image links. Customers see these as a gallery.</p>
 
                         <div className="space-y-3">
                             {formData.images.map((img, index) => (
-                                <div key={index} className="relative group">
+                                <div key={`${img}-${index}`} className="relative group">
                                     <img
-                                        src={img}
+                                        src={mediaUrl(img)}
                                         alt={`Salon ${index + 1}`}
                                         className="w-full h-32 object-cover rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
                                         onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/300?text=Error+Loading+Image')}
@@ -295,11 +317,29 @@ const SalonSettings = () => {
                                 </div>
                             ))}
 
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp,image/gif"
+                                multiple
+                                className="hidden"
+                                onChange={(e) => handleDeviceUpload(e.target.files)}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={uploading}
+                                className="w-full py-3 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-medium hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2 disabled:opacity-60"
+                            >
+                                {uploading ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
+                                {uploading ? 'Uploading…' : 'Upload from device'}
+                            </button>
+
                             {isAddingImage ? (
                                 <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3 animate-in fade-in zoom-in-95 duration-200">
                                     <input
                                         type="text"
-                                        placeholder="Image URL"
+                                        placeholder="Image URL (https://...)"
                                         value={newImage}
                                         onChange={(e) => setNewImage(e.target.value)}
                                         className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -333,7 +373,7 @@ const SalonSettings = () => {
                                     onClick={() => setIsAddingImage(true)}
                                     className="w-full py-3 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-medium hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2"
                                 >
-                                    <Plus size={18} /> Add Photo
+                                    <Plus size={18} /> Add photo URL
                                 </button>
                             )}
                         </div>

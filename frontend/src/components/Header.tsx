@@ -31,10 +31,10 @@ export const Header = () => {
                     {isAuthenticated ? (
                         <div className="flex items-center gap-4">
                             <Link
-                                to={!user ? '/login' : user?.role === 'salon_owner' ? '/owner-dashboard' : '/dashboard'}
+                                to={!user ? '/login' : user?.role === 'salon_owner' ? '/admin/dashboard' : '/dashboard'}
                                 className="text-sm font-medium hover:text-primary"
                             >
-                                Dashboard
+                                {user?.role === 'salon_owner' ? 'Dashboard' : 'My Account'}
                             </Link>
                             <button
                                 onClick={handleLogout}
@@ -85,12 +85,15 @@ export const Header = () => {
                         </div>
                         {isAuthenticated ? (
                             <>
-                                <Link to="/dashboard" className="text-sm font-medium p-2 hover:bg-slate-50 rounded-md">
-                                    Dashboard
+                                <Link
+                                    to={user?.role === 'salon_owner' ? '/admin/dashboard' : '/dashboard'}
+                                    className="text-sm font-medium p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-md"
+                                >
+                                    {user?.role === 'salon_owner' ? 'Dashboard' : 'My Account'}
                                 </Link>
                                 <button
                                     onClick={handleLogout}
-                                    className="text-sm font-medium p-2 text-left text-red-500 hover:bg-red-50 rounded-md"
+                                    className="text-sm font-medium p-2 text-left text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-md"
                                 >
                                     Logout
                                 </button>

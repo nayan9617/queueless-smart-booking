@@ -14,10 +14,14 @@
   --color-card: #ffffff;
   --color-card-foreground: #0f172a;
 
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Syne", ui-sans-serif, system-ui, sans-serif;
+
   --animate-pulse-slow: pulse-slow 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-queue-drift: queue-drift 28s linear infinite;
+  --animate-dial-breathe: dial-breathe 5s ease-in-out infinite;
 
   @keyframes pulse-slow {
-
     0%,
     100% {
       opacity: 1;
@@ -25,6 +29,29 @@
 
     50% {
       opacity: 0.5;
+    }
+  }
+
+  @keyframes queue-drift {
+    from {
+      transform: translateX(0);
+    }
+
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  @keyframes dial-breathe {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 0.55;
+    }
+
+    50% {
+      transform: scale(1.04);
+      opacity: 0.8;
     }
   }
 }
@@ -55,7 +82,30 @@
   }
 }
 
-/* Base styles */
-@layer base {
-  /* Removed redundant body style that was overriding the theme variables */
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+
+  .home-atmosphere {
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(59, 130, 246, 0.28), transparent 55%),
+      radial-gradient(ellipse 50% 40% at 90% 30%, rgba(37, 99, 235, 0.12), transparent 50%),
+      radial-gradient(ellipse 40% 35% at 10% 70%, rgba(14, 165, 233, 0.1), transparent 45%);
+  }
+
+  .dark .home-atmosphere {
+    background:
+      radial-gradient(ellipse 80% 60% at 50% -10%, rgba(59, 130, 246, 0.22), transparent 55%),
+      radial-gradient(ellipse 50% 40% at 85% 40%, rgba(30, 64, 175, 0.18), transparent 50%),
+      radial-gradient(ellipse 45% 40% at 8% 75%, rgba(14, 165, 233, 0.08), transparent 45%);
+  }
+
+  .queue-track {
+    animation: var(--animate-queue-drift);
+  }
+
+  .dial-breathe {
+    animation: var(--animate-dial-breathe);
+  }
 }

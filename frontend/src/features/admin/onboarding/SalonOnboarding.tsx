@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import api from '../../../services/api';
 import toast from 'react-hot-toast';
-import { Loader2, ArrowRight, MapPin, Store, Armchair, Scissors, Plus, Trash2, Image as ImageIcon } from 'lucide-react';
+import { Loader2, ArrowRight, MapPin, Store, Armchair, Scissors, Plus, Trash2, Image as ImageIcon, Upload } from 'lucide-react';
+import { mediaUrl } from '../../../utils/mediaUrl';
 
 const SalonOnboarding = () => {
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [step, setStep] = useState(1);
+    const [pendingFiles, setPendingFiles] = useState<File[]>([]);
     const [formData, setFormData] = useState({
         name: '',
         address: '',
         chairs: 1,
-        // Default services
         services: [
             { name: 'Haircut', durationMin: 30, price: 200 },
             { name: 'Shave', durationMin: 15, price: 100 }
@@ -18,19 +20,24 @@ const SalonOnboarding = () => {
         images: [] as string[]
     });
 
-    // New state for inline inputs
     const [newService, setNewService] = useState({ name: '', durationMin: 30, price: 0 });
     const [newImage, setNewImage] = useState('');
     const [isAddingService, setIsAddingService] = useState(false);
     const [isAddingImage, setIsAddingImage] = useState(false);
 
     const createSalonMutation = useMutation({
-        mutationFn: async (data: any) => {
-            await api.post('/salons', data);
+        mutationFn: async (data: typeof formData & { files: File[] }) => {
+            const { files, ...payload } = data;
+            const res = await api.post('/salons', payload);
+            const salonId = res.data?._id;
+            if (salonId && files.length) {
+                const body = new FormData();
+                files.forEach((f) => body.append('images', f));
+                await api.post(`/salons/${salonId}/images`, body);
+            }
         },
         onSuccess: () => {
             toast.success('Salon created successfully!');
-            // Force reload to refresh auth/salon state
             window.location.reload();
         },
         onError: (err: any) => {
@@ -43,7 +50,14 @@ const SalonOnboarding = () => {
             toast.error('Please fill in all required fields');
             return;
         }
-        createSalonMutation.mutate(formData);
+        createSalonMutation.mutate({ ...formData, files: pendingFiles });
+    };
+
+    const handlePickFiles = (files: FileList | null) => {
+        if (!files?.length) return;
+        const next = Array.from(files).slice(0, 8);
+        setPendingFiles((prev) => [...prev, ...next].slice(0, 8));
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     return (
@@ -285,8 +299,8 @@ const SalonOnboarding = () => {
 
                             <div className="space-y-3">
                                 {formData.images.map((img, index) => (
-                                    <div key={index} className="flex gap-3 items-center bg-slate-50 p-2 rounded-xl border border-slate-100">
-                                        <img src={img} alt="Salon" className="w-16 h-16 rounded-lg object-cover bg-slate-200" onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/150')} />
+                                    <div key={`url-${index}`} className="flex gap-3 items-center bg-slate-50 dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-700">
+                                        <img src={mediaUrl(img)} alt="Salon" className="w-16 h-16 rounded-lg object-cover bg-slate-200" onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/150')} />
                                         <div className="flex-1 truncate text-xs text-slate-500">{img}</div>
                                         <button
                                             onClick={() => {
@@ -301,12 +315,41 @@ const SalonOnboarding = () => {
                                     </div>
                                 ))}
 
-                                {formData.images.length === 0 && (
+                                {pendingFiles.map((file, index) => (
+                                    <div key={`file-${file.name}-${index}`} className="flex gap-3 items-center bg-slate-50 dark:bg-slate-900 p-2 rounded-xl border border-slate-100 dark:border-slate-700">
+                                        <img src={URL.createObjectURL(file)} alt={file.name} className="w-16 h-16 rounded-lg object-cover bg-slate-200" />
+                                        <div className="flex-1 truncate text-xs text-slate-500">{file.name}</div>
+                                        <button
+                                            onClick={() => setPendingFiles((prev) => prev.filter((_, i) => i !== index))}
+                                            className="text-red-400 hover:text-red-500 p-2"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </div>
+                                ))}
+
+                                {formData.images.length === 0 && pendingFiles.length === 0 && (
                                     <div className="p-8 text-center text-slate-400 border-2 border-dashed border-slate-100 dark:border-slate-700 rounded-xl">
                                         <ImageIcon size={32} className="mx-auto mb-2 opacity-50" />
                                         <p>No photos added yet</p>
                                     </div>
                                 )}
+
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    accept="image/jpeg,image/png,image/webp,image/gif"
+                                    multiple
+                                    className="hidden"
+                                    onChange={(e) => handlePickFiles(e.target.files)}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="w-full py-3 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl text-slate-500 dark:text-slate-400 font-medium hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2"
+                                >
+                                    <Upload size={18} /> Upload from device
+                                </button>
 
                                 {isAddingImage ? (
                                     <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-700 space-y-3 animate-in fade-in zoom-in-95 duration-200">

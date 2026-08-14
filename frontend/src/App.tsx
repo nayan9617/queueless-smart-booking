@@ -4,16 +4,15 @@ import AppLayout from './layouts/AppLayout';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import VerifyEmail from './pages/VerifyEmail';
 import Salons from './pages/Salons';
 import Dashboard from './pages/Dashboard';
-// import OwnerDashboard from './pages/OwnerDashboard';
 import AdminDashboard from './features/admin/dashboard/AdminDashboard';
 import { Toaster } from 'react-hot-toast';
 import Checkout from './pages/Checkout';
 import { ThemeProvider } from './context/ThemeContext';
 import ProtectedRoute from './components/ProtectedRoute';
 
-// Create a client
 const queryClient = new QueryClient();
 
 function App() {
@@ -25,23 +24,26 @@ function App() {
           <Routes>
             <Route element={<AppLayout />}>
               <Route path="/" element={<Home />} />
-              <Route element={<ProtectedRoute />}>
-                <Route path="/salons" element={<Salons />} />
-              </Route>
+              <Route path="/salons" element={<Salons />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/verify-email" element={<VerifyEmail />} />
 
-              {/* Admin Routes */}
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/checkout" element={<Checkout />} />
+              </Route>
+
+              <Route element={<ProtectedRoute roles={['salon_owner', 'admin']} />}>
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              </Route>
+
               <Route path="/owner-dashboard" element={<Navigate to="/admin/dashboard" replace />} />
-
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
         </BrowserRouter>
-      </QueryClientProvider >
+      </QueryClientProvider>
     </ThemeProvider>
   );
 }

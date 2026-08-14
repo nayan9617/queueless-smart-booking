@@ -31,11 +31,21 @@ const RatingModal = ({ bookingId, salonName, onClose, onSuccess }: RatingModalPr
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-            <div className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-sm shadow-xl p-6 relative animate-fade-in">
+        <div
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex justify-center items-center p-4"
+            onClick={onClose}
+            role="presentation"
+        >
+            <div
+                className="bg-white dark:bg-slate-800 rounded-2xl w-full max-w-sm shadow-xl p-6 relative animate-fade-in"
+                onClick={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+            >
                 <button
                     onClick={onClose}
                     className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                    aria-label="Close"
                 >
                     <X size={20} />
                 </button>
@@ -51,6 +61,7 @@ const RatingModal = ({ bookingId, salonName, onClose, onSuccess }: RatingModalPr
                     {[1, 2, 3, 4, 5].map((star) => (
                         <button
                             key={star}
+                            type="button"
                             onMouseEnter={() => setHoveredRating(star)}
                             onMouseLeave={() => setHoveredRating(0)}
                             onClick={() => setRating(star)}
@@ -68,11 +79,19 @@ const RatingModal = ({ bookingId, salonName, onClose, onSuccess }: RatingModalPr
                 </div>
 
                 <button
+                    type="button"
                     onClick={handleSubmit}
                     disabled={rating === 0 || isSubmitting}
                     className="w-full bg-primary hover:bg-blue-600 text-white py-3 rounded-xl font-semibold transition-all shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                     {isSubmitting ? 'Submitting...' : 'Submit Review'}
+                </button>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="w-full mt-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 py-2"
+                >
+                    Maybe later
                 </button>
             </div>
         </div>

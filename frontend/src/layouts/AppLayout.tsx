@@ -1,13 +1,16 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Header } from '../components/Header';
 import Logo from '../components/common/Logo';
 
 const AppLayout: React.FC = () => {
+    const { pathname } = useLocation();
+    const isHome = pathname === '/';
+
     return (
-        <div className="min-h-screen flex flex-col transition-colors duration-300">
+        <div className="min-h-screen flex flex-col transition-colors duration-300 overflow-x-hidden">
             <Header />
-            <main className="flex-1 container mx-auto px-4 py-8">
+            <main className={isHome ? 'flex-1 min-w-0' : 'flex-1 min-w-0 container mx-auto px-4 sm:px-6 py-6 md:py-8'}>
                 <Outlet />
             </main>
             <footer className="border-t py-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 transition-colors duration-300">
