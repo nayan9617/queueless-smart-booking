@@ -1,18 +1,29 @@
-# ML Service
+# QueueLess ML wait-time service
 
-FastAPI microservice for wait-time prediction.
-
-## Setup
+## Run
 
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+cd ml-service
+python3 -m venv venv
+./venv/bin/pip install -r requirements.txt
+./venv/bin/python -m uvicorn app.main:app --reload --port 8000
 ```
 
-## Scripts
+Uses root `.env` for `MONGO_URI` / `DB_NAME`. On startup, loads `data/wait_time_model.joblib` or trains automatically.
 
-- `GET /` - Health check.
-- `POST /predict` - Predict wait time.
-- `POST /train-init` - Trigger model training.
+## Train / metrics
+
+```bash
+# Optional: coherent historical completed bookings
+./venv/bin/python -m app.scripts.seed_ml_history
+
+curl -X POST http://localhost:8000/train
+curl http://localhost:8000/metrics
+```
+
+## What it does
+
+- **HistGradientBoosting** on engineered queue features (load, peak hours, cyclical time, workload).
+- **Hybrid** with multi-server physics baseline; weight shifts toward ML as real completed bookings grow.
+- **Confidence** from holdout MAE, physics agreement, and data volume (not a hardcoded 0.85).
+- Bookings store `mlSnapshot` at create time so live completions retrain cleanly.

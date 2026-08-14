@@ -1,0 +1,12 @@
+{
+  "n_samples": 2807,
+  "n_real": 2607,
+  "n_synthetic": 200,
+  "mae": 2.175,
+  "rmse": 11.001,
+  "r2": 0.9307,
+  "baseline_mae": 3.742,
+  "improvement_vs_baseline_pct": 41.88,
+  "trained_at": "2026-08-12T20:58:01.505937+00:00",
+  "model_type": "HistGradientBoostingRegressor+hybrid"
+}
