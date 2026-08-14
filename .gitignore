@@ -20,4 +20,6 @@ frontend/playwright/.cache/
 
 .vercel
 
+.vercel-beta-secrets.txt
+
 .DS_Store
