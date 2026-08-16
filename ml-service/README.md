@@ -21,6 +21,14 @@ curl -X POST http://localhost:8000/train
 curl http://localhost:8000/metrics
 ```
 
+`GET /metrics` still returns overall holdout `mae` (mixed organic + synthetic). It also returns:
+
+- `organic_mae` / `synthetic_mae` — holdout MAE split by `data_origin`
+- `n_holdout_organic` / `n_holdout_synthetic`
+- `mae_includes_synthetic` — `true` whenever synthetic fill was used
+
+Treat `organic_mae` as the number that matters for live bookings. Overall `mae` can look better than real performance when synthetic rows dominate the holdout.
+
 ## What it does
 
 - **HistGradientBoosting** on engineered queue features (load, peak hours, cyclical time, workload).

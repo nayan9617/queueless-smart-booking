@@ -45,7 +45,7 @@ Nearby sort currently uses in-app Haversine (no `2dsphere` yet). Add geo index o
 
 ## ML data quality note
 
-Holdout metrics in `ml-service/data/model_metrics.json` / `/health` include **synthetic fill**. Treat them as pipeline sanity checks, not production accuracy claims. Organic completed bookings must dominate before advertising wait-time quality.
+Holdout `mae` in `ml-service/data/model_metrics.json` / `/health` is still mixed (organic + synthetic fill). Use `organic_mae` for live accuracy; `synthetic_mae` is a pipeline sanity check. Do not advertise overall `mae` as production quality until organic history dominates (`mae_includes_synthetic` is `false`, or `n_holdout_organic` is large).
 
 
 ## Business hours (MVP)

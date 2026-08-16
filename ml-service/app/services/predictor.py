@@ -6,7 +6,7 @@ import json
 import os
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 import joblib
 import numpy as np
@@ -17,6 +17,7 @@ from sklearn.model_selection import train_test_split
 from app.core.config import get_settings
 from app.services.data_loader import fetch_training_data, generate_synthetic_training_data
 from app.services.features import FEATURE_COLUMNS, engineer_row, feature_matrix, naive_wait, rows_to_frame
+from app.services.metrics import holdout_metrics_by_origin
 
 settings = get_settings()
 MODEL_PATH = settings.MODEL_PATH
@@ -33,8 +34,18 @@ class TrainMetrics:
     r2: float
     baseline_mae: float
     improvement_vs_baseline_pct: float
+    n_holdout: int
+    n_holdout_organic: int
+    n_holdout_synthetic: int
+    organic_mae: Optional[float]
+    synthetic_mae: Optional[float]
+    organic_rmse: Optional[float]
+    synthetic_rmse: Optional[float]
+    organic_baseline_mae: Optional[float]
+    synthetic_baseline_mae: Optional[float]
     trained_at: str
     model_type: str
+    mae_includes_synthetic: bool
 
 
 class WaitTimePredictor:
@@ -70,9 +81,15 @@ class WaitTimePredictor:
         df = rows_to_frame(rows)
         X = feature_matrix(df)
         y = df["actual_wait_time"].astype(float).values
+        origins = np.array([str(r.get("data_origin") or "organic") for r in rows])
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42
+        split_kwargs: dict[str, Any] = {"test_size": 0.2, "random_state": 42}
+        unique, counts = np.unique(origins, return_counts=True)
+        if len(unique) > 1 and int(counts.min()) >= 2:
+            split_kwargs["stratify"] = origins
+
+        X_train, X_test, y_train, y_test, _origin_train, origin_test = train_test_split(
+            X, y, origins, **split_kwargs
         )
 
         model = HistGradientBoostingRegressor(
@@ -106,6 +123,9 @@ class WaitTimePredictor:
         )
         baseline_mae = float(mean_absolute_error(y_test, baseline_preds))
         improvement = 0.0 if baseline_mae <= 1e-6 else float((baseline_mae - mae) / baseline_mae * 100.0)
+        by_origin = holdout_metrics_by_origin(y_test, preds, origin_test, baseline_preds)
+        organic = by_origin["organic"]
+        synth = by_origin["synthetic"]
 
         metrics = TrainMetrics(
             n_samples=len(rows),
@@ -116,8 +136,18 @@ class WaitTimePredictor:
             r2=round(r2, 4),
             baseline_mae=round(baseline_mae, 3),
             improvement_vs_baseline_pct=round(improvement, 2),
+            n_holdout=len(y_test),
+            n_holdout_organic=int(organic["n"]),
+            n_holdout_synthetic=int(synth["n"]),
+            organic_mae=organic["mae"],
+            synthetic_mae=synth["mae"],
+            organic_rmse=organic["rmse"],
+            synthetic_rmse=synth["rmse"],
+            organic_baseline_mae=organic["baseline_mae"],
+            synthetic_baseline_mae=synth["baseline_mae"],
             trained_at=datetime.now(timezone.utc).isoformat(),
             model_type="HistGradientBoostingRegressor+hybrid",
+            mae_includes_synthetic=len(synthetic) > 0,
         )
 
         self.model = model
@@ -136,10 +166,13 @@ class WaitTimePredictor:
         with open(METRICS_PATH, "w", encoding="utf-8") as f:
             json.dump(self.metrics, f, indent=2)
 
+        org_mae = organic["mae"] if organic["mae"] is not None else "n/a"
+        syn_mae = synth["mae"] if synth["mae"] is not None else "n/a"
         print(
             f"Model trained on {len(rows)} samples "
             f"(real={len(real)}, synth={len(synthetic)}) | "
-            f"MAE={mae:.2f} vs baseline {baseline_mae:.2f} | R²={r2:.3f}"
+            f"MAE={mae:.2f} (organic={org_mae}, synth={syn_mae}) "
+            f"vs baseline {baseline_mae:.2f} | R²={r2:.3f}"
         )
         return self.metrics
 
